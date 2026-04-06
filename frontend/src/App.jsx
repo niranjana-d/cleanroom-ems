@@ -101,16 +101,15 @@ const Dashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // --- 🔥 NEW: SOUND ALERT LOGIC ADDED HERE ---
+  // --- 🔥 SOUND ALERT LOGIC ---
   useEffect(() => {
     // 1. Define Limit
     const CRITICAL_TEMP = 25.0;
     
     // 2. Check if ANY room is overheating
-    // We look through the 'rooms' array. If we find one room > 40, isCritical = true.
     const criticalRoom = rooms.find(r => (r.temperature || 0) > CRITICAL_TEMP);
     
-    // 3. Get the Audio Player (It lives in Sidebar, which is fine!)
+    // 3. Get the Audio Player
     const audio = document.getElementById("alertSound");
 
     if (criticalRoom) {
@@ -119,17 +118,21 @@ const Dashboard = () => {
         // Visual Cue
         document.body.style.backgroundColor = "#fee2e2"; // Light Red
         
-        // Audio Cue
+        // Audio Cue — play with loop for continuous alarm
         if (audio && audio.paused) {
-            audio.play().catch(e => console.log("⚠️ Click page to enable sound"));
+            audio.loop = true;
+            audio.play().catch(e => {
+                console.warn("⚠️ Browser blocked autoplay. Click 'Enable Alert Sound' button first.");
+            });
         }
     } else {
-        // Safe
+        // Safe — stop alarm
         document.body.style.backgroundColor = "#f8fafc"; // Back to Slate-50
         
         if (audio) {
             audio.pause();
             audio.currentTime = 0;
+            audio.loop = false;
         }
     }
   }, [rooms]); // Runs every time 'rooms' updates
@@ -145,19 +148,43 @@ const Dashboard = () => {
       </div>
 
          <button
+      id="enable-alert-sound-btn"
       onClick={() => {
         const audio = document.getElementById("alertSound");
         if (audio) {
+          audio.muted = false;
+          audio.volume = 1.0;
           audio.play()
             .then(() => {
-              audio.pause();
-              audio.currentTime = 0;
-              alert("🔊 Alert sound enabled");
+              // Let it play briefly (100ms) so the browser registers user-initiated playback
+              setTimeout(() => {
+                audio.pause();
+                audio.currentTime = 0;
+                // Visual feedback instead of alert() dialog which steals focus
+                const btn = document.getElementById('enable-alert-sound-btn');
+                if (btn) {
+                  btn.textContent = '✅ Sound Enabled';
+                  btn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                  btn.classList.add('bg-emerald-500', 'cursor-default');
+                  setTimeout(() => {
+                    btn.textContent = 'Enable Alert Sound';
+                    btn.classList.remove('bg-emerald-500', 'cursor-default');
+                    btn.classList.add('bg-green-600', 'hover:bg-green-700');
+                  }, 2000);
+                }
+              }, 150);
             })
-            .catch(() => alert("Click again to enable sound"));
+            .catch(() => {
+              // If blocked, show a subtle message
+              const btn = document.getElementById('enable-alert-sound-btn');
+              if (btn) {
+                btn.textContent = '⚠️ Click Again';
+                setTimeout(() => { btn.textContent = 'Enable Alert Sound'; }, 2000);
+              }
+            });
         }
       }}
-      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-bold shadow"
+      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-bold shadow transition-all"
     >
       Enable Alert Sound
     </button>
@@ -174,7 +201,7 @@ const Dashboard = () => {
                   <div className="text-right"><span className={`text-xs font-bold ${trend === "rising" ? "text-red-500" : "text-green-500"}`}>{trend === "rising" ? "Rising ⬆️" : "Stable ➡️"}</span></div>
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-center mb-4">
-                    <div className="bg-gray-50 p-2 rounded"><span className="block text-gray-500 text-xs uppercase">Temp</span><span className={`block font-bold text-lg ${room.temperature > 40 ? 'text-red-600 animate-pulse' : 'text-gray-800'}`}>{room.temperature || 0}°C</span></div>
+                    <div className="bg-gray-50 p-2 rounded"><span className="block text-gray-500 text-xs uppercase">Temp</span><span className={`block font-bold text-lg ${room.temperature > 25 ? 'text-red-600 animate-pulse' : 'text-gray-800'}`}>{room.temperature || 0}°C</span></div>
                     <div className="bg-gray-50 p-2 rounded"><span className="block text-gray-500 text-xs uppercase">Hum</span><span className="block font-bold text-lg text-blue-600">{room.humidity || 0}%</span></div>
                     <div className="bg-gray-50 p-2 rounded"><span className="block text-gray-500 text-xs uppercase">Press</span><span className="block font-bold text-lg text-green-600">{room.pressure || 0}Pa</span></div>
                 </div>
