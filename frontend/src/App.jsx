@@ -101,41 +101,57 @@ const Dashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // --- 🔥 SOUND ALERT LOGIC ---
+  // --- 🔥 AUTO SOUND ALERT (No button needed) ---
+  // Silently unlock audio on ANY user interaction (login click counts)
   useEffect(() => {
-    // 1. Define Limit
+    let unlocked = false;
+    const unlockAudio = () => {
+      if (unlocked) return;
+      const audio = document.getElementById("alertSound");
+      if (audio) {
+        // Play silently then immediately pause — this satisfies browser autoplay policy
+        audio.volume = 0;
+        audio.play().then(() => {
+          audio.pause();
+          audio.currentTime = 0;
+          audio.volume = 1.0;
+          unlocked = true;
+          console.log("🔊 Audio unlocked via user interaction");
+        }).catch(() => {});
+      }
+    };
+    document.addEventListener("click", unlockAudio);
+    document.addEventListener("keydown", unlockAudio);
+    return () => {
+      document.removeEventListener("click", unlockAudio);
+      document.removeEventListener("keydown", unlockAudio);
+    };
+  }, []);
+
+  // Trigger alarm sound when any room exceeds critical temperature
+  useEffect(() => {
     const CRITICAL_TEMP = 25.0;
-    
-    // 2. Check if ANY room is overheating
     const criticalRoom = rooms.find(r => (r.temperature || 0) > CRITICAL_TEMP);
-    
-    // 3. Get the Audio Player
     const audio = document.getElementById("alertSound");
 
     if (criticalRoom) {
         console.log("🔥 ALARM! Room " + criticalRoom.name + " is overheating!");
+        document.body.style.backgroundColor = "#fee2e2";
         
-        // Visual Cue
-        document.body.style.backgroundColor = "#fee2e2"; // Light Red
-        
-        // Audio Cue — play with loop for continuous alarm
         if (audio && audio.paused) {
+            audio.volume = 1.0;
             audio.loop = true;
-            audio.play().catch(e => {
-                console.warn("⚠️ Browser blocked autoplay. Click 'Enable Alert Sound' button first.");
-            });
+            audio.play().catch(() => {});
         }
     } else {
-        // Safe — stop alarm
-        document.body.style.backgroundColor = "#f8fafc"; // Back to Slate-50
-        
+        document.body.style.backgroundColor = "#f8fafc";
         if (audio) {
             audio.pause();
             audio.currentTime = 0;
             audio.loop = false;
         }
     }
-  }, [rooms]); // Runs every time 'rooms' updates
+  }, [rooms]);
   // ---------------------------------------------
 
   const handleResolveClick = (roomName) => { setSelectedRoom(roomName); setShowSigModal(true); };
@@ -146,48 +162,6 @@ const Dashboard = () => {
         <div><h2 className="text-3xl font-bold text-slate-800">System Overview</h2><p className="text-sm text-green-600 font-bold">● System Operational</p></div>
         <ReportButton />
       </div>
-
-         <button
-      id="enable-alert-sound-btn"
-      onClick={() => {
-        const audio = document.getElementById("alertSound");
-        if (audio) {
-          audio.muted = false;
-          audio.volume = 1.0;
-          audio.play()
-            .then(() => {
-              // Let it play briefly (100ms) so the browser registers user-initiated playback
-              setTimeout(() => {
-                audio.pause();
-                audio.currentTime = 0;
-                // Visual feedback instead of alert() dialog which steals focus
-                const btn = document.getElementById('enable-alert-sound-btn');
-                if (btn) {
-                  btn.textContent = '✅ Sound Enabled';
-                  btn.classList.remove('bg-green-600', 'hover:bg-green-700');
-                  btn.classList.add('bg-emerald-500', 'cursor-default');
-                  setTimeout(() => {
-                    btn.textContent = 'Enable Alert Sound';
-                    btn.classList.remove('bg-emerald-500', 'cursor-default');
-                    btn.classList.add('bg-green-600', 'hover:bg-green-700');
-                  }, 2000);
-                }
-              }, 150);
-            })
-            .catch(() => {
-              // If blocked, show a subtle message
-              const btn = document.getElementById('enable-alert-sound-btn');
-              if (btn) {
-                btn.textContent = '⚠️ Click Again';
-                setTimeout(() => { btn.textContent = 'Enable Alert Sound'; }, 2000);
-              }
-            });
-        }
-      }}
-      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-bold shadow transition-all"
-    >
-      Enable Alert Sound
-    </button>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1 space-y-4">
